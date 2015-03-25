@@ -76,6 +76,9 @@ typedef struct FilterParams {
     uint8_t     shift; ///< Right shift to apply to output of filter.
 
     int32_t     state[MAX_FIR_ORDER];
+    int32_t	coeff[NUM_FILTERS]; 
+    int32_t	coeff_shift;
+    int32_t	coeff_bits;
 } FilterParams;
 
 /** sample data coding information */
@@ -95,6 +98,8 @@ typedef struct ChannelParams {
  *  00 or 01, but have different codes starting with 1.
  */
 extern const uint8_t ff_mlp_huffman_tables[3][18][2];
+
+extern ChannelInformation ff_mlp_ch_info[21];
 
 /** MLP uses checksums that seem to be based on the standard CRC algorithm, but
  *  are not (in implementation terms, the table lookup and XOR are reversed).
