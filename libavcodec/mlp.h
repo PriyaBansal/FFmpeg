@@ -76,9 +76,9 @@ typedef struct FilterParams {
     uint8_t     shift; ///< Right shift to apply to output of filter.
 
     int32_t     state[MAX_FIR_ORDER];
-    int32_t	coeff[NUM_FILTERS]; 
-    int32_t	coeff_shift;
-    int32_t	coeff_bits;
+    int32_t	coeff[NUM_FILTERS]; //add
+    int32_t	coeff_shift;//add
+    int32_t 	coeff_bits;//add
 } FilterParams;
 
 /** sample data coding information */
@@ -99,7 +99,42 @@ typedef struct ChannelParams {
  */
 extern const uint8_t ff_mlp_huffman_tables[3][18][2];
 
+typedef struct {
+ uint8_t channel_occupancy;
+ uint8_t group1_channels;
+ uint8_t group2_channels;
+ uint8_t summary_info;
+} ChannelInformation;
+
+/** Tables defining channel information.
+ *
+ * Possible channel arrangements are:
+ *
+ * (Group 1) C
+ * (Group 1) L, R
+ * (Group 1) Lf, Rf / (Group 2) S
+ * (Group 1) Lf, Rf / (Group 2) Ls, Rs
+ * (Group 1) Lf, Rf / (Group 2) LFE
+ * (Group 1) Lf, Rf / (Group 2) LFE, S
+ * (Group 1) Lf, Rf / (Group 2) LFE, Ls, Rs
+ * (Group 1) Lf, Rf / (Group 2) C
+ * (Group 1) Lf, Rf / (Group 2) C, S
+ * (Group 1) Lf, Rf / (Group 2) C, Ls, Rs
+ * (Group 1) Lf, Rf / (Group 2) C, LFE
+ * (Group 1) Lf, Rf / (Group 2) C, LFE, S
+ * (Group 1) Lf, Rf / (Group 2) C, LFE, Ls, Rs
+ * (Group 1) Lf, Rf C / (Group 2) S
+ * (Group 1) Lf, Rf C / (Group 2) Ls, Rs
+ * (Group 1) Lf, Rf C / (Group 2) LFE
+ * (Group 1) Lf, Rf C / (Group 2) LFE, S
+ * (Group 1) Lf, Rf C / (Group 2) LFE, Ls, Rs
+ * (Group 1) Lf, Rf Ls Rs / (Group 2) LFE
+ * (Group 1) Lf, Rf Ls Rs / (Group 2) C
+ * (Group 1) Lf, Rf, Ls, Rs / (Group 2) C, LFE
+ */
 extern ChannelInformation ff_mlp_ch_info[21];
+
+
 
 /** MLP uses checksums that seem to be based on the standard CRC algorithm, but
  *  are not (in implementation terms, the table lookup and XOR are reversed).

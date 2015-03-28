@@ -187,10 +187,10 @@ typedef struct {
     DecodingParams *seq_decoding_params;
 
     unsigned int    max_codebook_search;
-    
+
     //DSPContext      dsp;
     LPCContext lpc_ctx;
-} MLPEncodeContext;
+} AlacEncodeContext;
 
 static ChannelParams   restart_channel_params[MAX_CHANNELS];
 static DecodingParams  restart_decoding_params[MAX_SUBSTREAMS];
@@ -242,7 +242,7 @@ static int compare_filter_params(FilterParams *prev, FilterParams *fp)
 /** Compare two primitive matrices and returns 1 if anything has changed.
  *  Returns 0 if they are both equal.
  */
-static int compare_matrix_params(MLPEncodeContext *ctx, MatrixParams *prev, MatrixParams *mp)
+static int compare_matrix_params(AlacEncodeContext *ctx, MatrixParams *prev, MatrixParams *mp)
 {
     RestartHeader *rh = ctx->cur_restart_header;
     unsigned int channel, mat;
@@ -272,7 +272,7 @@ static int compare_matrix_params(MLPEncodeContext *ctx, MatrixParams *prev, Matr
 /** Compares two DecodingParams and ChannelParams structures to decide if a
  *  new decoding params header has to be written.
  */
-static int compare_decoding_params(MLPEncodeContext *ctx)
+static int compare_decoding_params(AlacEncodeContext *ctx)
 {
     DecodingParams *prev = ctx->prev_decoding_params;
     DecodingParams *dp = ctx->cur_decoding_params;
@@ -366,7 +366,7 @@ static void copy_matrix_params(MatrixParams *dst, MatrixParams *src)
     }
 }
 
-static void copy_restart_frame_params(MLPEncodeContext *ctx,
+static void copy_restart_frame_params(AlacEncodeContext *ctx,
                                       unsigned int substr)
 {
 //    ChannelParams (*seq_cp)[ctx->avctx->channels] = (ChannelParams (*)[ctx->avctx->channels]) ctx->seq_channel_params;
@@ -396,7 +396,7 @@ static void copy_restart_frame_params(MLPEncodeContext *ctx,
 }
 
 /** Clears a DecodingParams struct the way it should be after a restart header. */
-static void clear_decoding_params(MLPEncodeContext *ctx, DecodingParams decoding_params[MAX_SUBSTREAMS])
+static void clear_decoding_params(AlacEncodeContext *ctx, DecodingParams decoding_params[MAX_SUBSTREAMS])
 {
     unsigned int substr;
 
@@ -412,7 +412,7 @@ static void clear_decoding_params(MLPEncodeContext *ctx, DecodingParams decoding
 }
 
 /** Clears a ChannelParams struct the way it should be after a restart header. */
-static void clear_channel_params(MLPEncodeContext *ctx, ChannelParams channel_params[MAX_CHANNELS])
+static void clear_channel_params(AlacEncodeContext *ctx, ChannelParams channel_params[MAX_CHANNELS])
 {
     unsigned int channel;
 
@@ -429,7 +429,7 @@ static void clear_channel_params(MLPEncodeContext *ctx, ChannelParams channel_pa
 }
 
 /** Sets default vales in our encoder for a DecodingParams struct. */
-static void default_decoding_params(MLPEncodeContext *ctx,
+static void default_decoding_params(AlacEncodeContext *ctx,
      DecodingParams decoding_params[MAX_SUBSTREAMS])
 {
     unsigned int substr;
@@ -477,9 +477,9 @@ static int mlp_peak_bitrate(int peak_bitrate, int sample_rate)
     return ((peak_bitrate << 4) - 8) / sample_rate;
 }
 
-static av_cold int mlp_encode_init(AVCodecContext *avctx)
+static av_cold int alac_encode_init(AVCodecContext *avctx)
 {
-    MLPEncodeContext *ctx = avctx->priv_data;
+    AlacEncodeContext *ctx = avctx->priv_data;
     unsigned int substr, index;
     unsigned int sum = 0;
     unsigned int size;
@@ -555,7 +555,7 @@ static av_cold int mlp_encode_init(AVCodecContext *avctx)
     case AV_SAMPLE_FMT_S16:
         ctx->coded_sample_fmt[0] = BITS_16;
         ctx->wordlength = 16;
-        break;
+        break; 
     /* TODO 20 bits: */
     case AV_SAMPLE_FMT_S32:
         ctx->coded_sample_fmt[0] = BITS_24;
@@ -565,7 +565,7 @@ static av_cold int mlp_encode_init(AVCodecContext *avctx)
         av_log(avctx, AV_LOG_ERROR, "Sample format not supported. "
                "Only 16- and 24-bit samples are supported.\n");
         return -1;
-    }
+    } 
     ctx->coded_sample_fmt[1] = -1 & 0xf;
 
     avctx->coded_frame = av_frame_alloc();
@@ -694,13 +694,13 @@ static av_cold int mlp_encode_init(AVCodecContext *avctx)
  ********************** Functions that do bitcounting ***********************
  ****************************************************************************/
 
-static unsigned int bitcount_restart_header(MLPEncodeContext *ctx)
+static unsigned int bitcount_restart_header(AlacEncodeContext *ctx)
 {
     RestartHeader *rh = ctx->cur_restart_header;
     return 121 + (rh->max_matrix_channel + 1) * 6;
 }
 
-static unsigned int bitcount_filter_params(MLPEncodeContext *ctx,
+static unsigned int bitcount_filter_params(AlacEncodeContext *ctx,
                                            unsigned int channel, unsigned int filter)
 {
     FilterParams *fp = &ctx->cur_channel_params[channel].filter_params[filter];
@@ -715,7 +715,7 @@ static unsigned int bitcount_filter_params(MLPEncodeContext *ctx,
     return bitcount;
 }
 
-static unsigned int bitcount_matrix_params(MLPEncodeContext *ctx)
+static unsigned int bitcount_matrix_params(AlacEncodeContext *ctx)
 {
     DecodingParams *dp = ctx->cur_decoding_params;
     MatrixParams *mp = &dp->matrix_params;
@@ -738,7 +738,7 @@ static unsigned int bitcount_matrix_params(MLPEncodeContext *ctx)
     return bitcount;
 }
 
-static unsigned int bitcount_decoding_params(MLPEncodeContext *ctx,
+static unsigned int bitcount_decoding_params(AlacEncodeContext *ctx,
                                              int params_changed)
 {
     DecodingParams *dp = ctx->cur_decoding_params;
@@ -811,7 +811,7 @@ static unsigned int bitcount_decoding_params(MLPEncodeContext *ctx,
  ****************************************************************************/
 
 /** Writes a major sync header to the bitstream. */
-static void write_major_sync(MLPEncodeContext *ctx, uint8_t *buf, int buf_size)
+static void write_major_sync(AlacEncodeContext *ctx, uint8_t *buf, int buf_size)
 {
     PutBitContext pb;
 
@@ -858,7 +858,7 @@ static void write_major_sync(MLPEncodeContext *ctx, uint8_t *buf, int buf_size)
  *  decoded losslessly again after such a header and the subsequent decoding
  *  params header.
  */
-static void write_restart_header(MLPEncodeContext *ctx, PutBitContext *pb)
+static void write_restart_header(AlacEncodeContext *ctx, PutBitContext *pb)
 {
     RestartHeader *rh = ctx->cur_restart_header;
     int32_t lossless_check = xor_32_to_8(rh->lossless_check_data);
@@ -895,7 +895,7 @@ static void write_restart_header(MLPEncodeContext *ctx, PutBitContext *pb)
 }
 
 /** Writes matrix params for all primitive matrices to the bitstream. */
-static void write_matrix_params(MLPEncodeContext *ctx, PutBitContext *pb)
+static void write_matrix_params(AlacEncodeContext *ctx, PutBitContext *pb)
 {
     DecodingParams *dp = ctx->cur_decoding_params;
     MatrixParams *mp = &dp->matrix_params;
@@ -927,7 +927,7 @@ static void write_matrix_params(MLPEncodeContext *ctx, PutBitContext *pb)
 }
 
 /** Writes filter parameters for one filter to the bitstream. */
-static void write_filter_params(MLPEncodeContext *ctx, PutBitContext *pb,
+static void write_filter_params(AlacEncodeContext *ctx, PutBitContext *pb,
                                 unsigned int channel, unsigned int filter)
 {
     FilterParams *fp = &ctx->cur_channel_params[channel].filter_params[filter];
@@ -953,7 +953,7 @@ static void write_filter_params(MLPEncodeContext *ctx, PutBitContext *pb,
 /** Writes decoding parameters to the bitstream. These change very often,
  *  usually at almost every frame.
  */
-static void write_decoding_params(MLPEncodeContext *ctx, PutBitContext *pb,
+static void write_decoding_params(AlacEncodeContext *ctx, PutBitContext *pb,
                                   int params_changed)
 {
     DecodingParams *dp = ctx->cur_decoding_params;
@@ -1051,7 +1051,7 @@ static void write_decoding_params(MLPEncodeContext *ctx, PutBitContext *pb,
 /** Writes the residuals to the bitstream. That is, the VLC codes from the
  *  codebooks (if any is used), and then the residual.
  */
-static void write_block_data(MLPEncodeContext *ctx, PutBitContext *pb)
+static void write_block_data(AlacEncodeContext *ctx, PutBitContext *pb)
 {
     DecodingParams *dp = ctx->cur_decoding_params;
     RestartHeader  *rh = ctx->cur_restart_header;
@@ -1102,7 +1102,7 @@ static void write_block_data(MLPEncodeContext *ctx, PutBitContext *pb)
 }
 
 /** Writes the substreams data to the bitstream. */
-static uint8_t *write_substrs(MLPEncodeContext *ctx, uint8_t *buf, int buf_size,
+static uint8_t *write_substrs(AlacEncodeContext *ctx, uint8_t *buf, int buf_size,
                              int restart_frame,
                              uint16_t substream_data_len[MAX_SUBSTREAMS])
 {
@@ -1194,7 +1194,7 @@ static uint8_t *write_substrs(MLPEncodeContext *ctx, uint8_t *buf, int buf_size,
 }
 
 /** Writes the access unit and substream headers to the bitstream. */
-static void write_frame_headers(MLPEncodeContext *ctx, uint8_t *frame_header,
+static void write_frame_headers(AlacEncodeContext *ctx, uint8_t *frame_header,
                                 uint8_t *substream_headers, unsigned int length,
                                 int restart_frame,
                                 uint16_t substream_data_len[MAX_SUBSTREAMS])
@@ -1233,7 +1233,7 @@ static void write_frame_headers(MLPEncodeContext *ctx, uint8_t *frame_header,
 }
 
 /** Writes an entire access unit to the bitstream. */
-static unsigned int write_access_unit(MLPEncodeContext *ctx, uint8_t *buf,
+static unsigned int write_access_unit(AlacEncodeContext *ctx, uint8_t *buf,
                                       int buf_size, int restart_frame)
 {
     uint16_t substream_data_len[MAX_SUBSTREAMS];
@@ -1283,7 +1283,7 @@ static unsigned int write_access_unit(MLPEncodeContext *ctx, uint8_t *buf,
  *  appropriately depending on the bit-depth, and calculates the
  *  lossless_check_data that will be written to the restart header.
  */
-static void input_data_internal(MLPEncodeContext *ctx, const uint8_t *samples,
+static void input_data_internal(AlacEncodeContext *ctx, const uint8_t *samples,
                                 int is24)
 {
     int32_t *lossless_check_data = ctx->lossless_check_data;
@@ -1328,7 +1328,7 @@ static void input_data_internal(MLPEncodeContext *ctx, const uint8_t *samples,
 }
 
 /** Wrapper function for inputting data in two different bit-depths. */
-static void input_data(MLPEncodeContext *ctx, void *samples)
+static void input_data(AlacEncodeContext *ctx, void *samples)
 {
     if (ctx->avctx->sample_fmt == AV_SAMPLE_FMT_S32)
         input_data_internal(ctx, samples, 1);
@@ -1336,7 +1336,7 @@ static void input_data(MLPEncodeContext *ctx, void *samples)
         input_data_internal(ctx, samples, 0);
 }
 
-static void input_to_sample_buffer(MLPEncodeContext *ctx)
+static void input_to_sample_buffer(AlacEncodeContext *ctx)
 {
     int32_t *sample_buffer = ctx->sample_buffer;
     unsigned int index;
@@ -1377,7 +1377,7 @@ static int number_trailing_zeroes(int32_t sample)
 /** Determines how many bits are zero at the end of all samples so they can be
  *  shifted out.
  */
-static void determine_quant_step_size(MLPEncodeContext *ctx)
+static void determine_quant_step_size(AlacEncodeContext *ctx)
 {
     DecodingParams *dp = ctx->cur_decoding_params;
     RestartHeader  *rh = ctx->cur_restart_header;
@@ -1404,7 +1404,7 @@ static void determine_quant_step_size(MLPEncodeContext *ctx)
  *  coefficients, and if it's possible to right-shift their values without
  *  losing any precision.
  */
-static void code_filter_coeffs(MLPEncodeContext *ctx, FilterParams *fp)
+static void code_filter_coeffs(AlacEncodeContext *ctx, FilterParams *fp)
 {
     int min = INT_MAX, max = INT_MIN;
     int bits, shift;
@@ -1434,7 +1434,7 @@ static void code_filter_coeffs(MLPEncodeContext *ctx, FilterParams *fp)
  *  necessary information to the context.
  *  TODO Add IIR filter predictor!
  */
-static void set_filter_params(MLPEncodeContext *ctx,
+static void set_filter_params(AlacEncodeContext *ctx,
                               unsigned int channel, unsigned int filter,
                               int clear_filter)
 {
@@ -1482,7 +1482,7 @@ static void set_filter_params(MLPEncodeContext *ctx,
  *  buffer if the filter is good enough. Sets the filter data to be cleared if
  *  no good filter was found.
  */
-static void determine_filters(MLPEncodeContext *ctx)
+static void determine_filters(AlacEncodeContext *ctx)
 {
     RestartHeader *rh = ctx->cur_restart_header;
     int channel, filter;
@@ -1498,7 +1498,7 @@ static void determine_filters(MLPEncodeContext *ctx)
 #define MLP_CHMODE_RIGHT_SIDE   2
 #define MLP_CHMODE_MID_SIDE     3
 
-static int estimate_stereo_mode(MLPEncodeContext *ctx)
+static int estimate_stereo_mode(AlacEncodeContext *ctx)
 {
     uint64_t score[4], sum[4] = { 0, 0, 0, 0, };
     int32_t *right_ch = ctx->sample_buffer + 1;
@@ -1530,7 +1530,7 @@ static int estimate_stereo_mode(MLPEncodeContext *ctx)
 /** Determines how many fractional bits are needed to encode matrix
  *  coefficients. Also shifts the coefficients to fit within 2.14 bits.
  */
-static void code_matrix_coeffs(MLPEncodeContext *ctx, unsigned int mat)
+static void code_matrix_coeffs(AlacEncodeContext *ctx, unsigned int mat)
 {
     DecodingParams *dp = ctx->cur_decoding_params;
     MatrixParams *mp = &dp->matrix_params;
@@ -1549,7 +1549,7 @@ static void code_matrix_coeffs(MLPEncodeContext *ctx, unsigned int mat)
 }
 
 /** Determines best coefficients to use for the lossless matrix. */
-static void lossless_matrix_coeffs(MLPEncodeContext *ctx)
+static void lossless_matrix_coeffs(AlacEncodeContext *ctx)
 {
     DecodingParams *dp = ctx->cur_decoding_params;
     MatrixParams *mp = &dp->matrix_params;
@@ -1623,7 +1623,7 @@ static int codebook_extremes[3][2] = {
 /** Determines the amount of bits needed to encode the samples using no
  *  codebooks and a specified offset.
  */
-static void no_codebook_bits_offset(MLPEncodeContext *ctx,
+static void no_codebook_bits_offset(AlacEncodeContext *ctx,
                                     unsigned int channel, int16_t offset,
                                     int32_t min, int32_t max,
                                     BestOffset *bo)
@@ -1651,7 +1651,7 @@ static void no_codebook_bits_offset(MLPEncodeContext *ctx,
 /** Determines the least amount of bits needed to encode the samples using no
  *  codebooks.
  */
-static void no_codebook_bits(MLPEncodeContext *ctx,
+static void no_codebook_bits(AlacEncodeContext *ctx,
                              unsigned int channel,
                              int32_t min, int32_t max,
                              BestOffset *bo)
@@ -1690,7 +1690,7 @@ static void no_codebook_bits(MLPEncodeContext *ctx,
 /** Determines the least amount of bits needed to encode the samples using a
  *  given codebook and a given offset.
  */
-static inline void codebook_bits_offset(MLPEncodeContext *ctx,
+static inline void codebook_bits_offset(AlacEncodeContext *ctx,
                                         unsigned int channel, int codebook,
                                         int32_t sample_min, int32_t sample_max,
                                         int16_t offset, BestOffset *bo)
@@ -1754,7 +1754,7 @@ static inline void codebook_bits_offset(MLPEncodeContext *ctx,
 /** Determines the least amount of bits needed to encode the samples using a
  *  given codebook. Searches for the best offset to minimize the bits.
  */
-static inline void codebook_bits(MLPEncodeContext *ctx,
+static inline void codebook_bits(AlacEncodeContext *ctx,
                                  unsigned int channel, int codebook,
                                  int offset, int32_t min, int32_t max,
                                  BestOffset *bo, int direction)
@@ -1798,7 +1798,7 @@ static inline void codebook_bits(MLPEncodeContext *ctx,
 /** Determines the least amount of bits needed to encode the samples using
  *  any or no codebook.
  */
-static void determine_bits(MLPEncodeContext *ctx)
+static void determine_bits(AlacEncodeContext *ctx)
 {
     DecodingParams *dp = ctx->cur_decoding_params;
     RestartHeader  *rh = ctx->cur_restart_header;
@@ -1870,11 +1870,16 @@ static void determine_bits(MLPEncodeContext *ctx)
  *  maximum amount of bits allowed (24), the samples buffer is left as is and
  *  the function returns -1.
  */
-static int apply_filter(MLPEncodeContext *ctx, unsigned int channel)
+static int apply_filter(AlacEncodeContext *ctx, unsigned int channel)
 {
     FilterParams *fp[NUM_FILTERS] = { &ctx->cur_channel_params[channel].filter_params[FIR],
                                       &ctx->cur_channel_params[channel].filter_params[IIR], };
-    int32_t filter_state_buffer[NUM_FILTERS][ctx->number_of_samples];
+    int32_t *filter_state_buffer = av_malloc((sizeof(int32_t)*NUM_FILTERS * ctx->number_of_samples));
+
+    if(filter_state_buffer == NULL){
+	    return -1;
+    }
+
     int32_t mask = MSB_MASK(ctx->cur_decoding_params->quant_step_size[channel]);
     int32_t *sample_buffer = ctx->sample_buffer + channel;
     unsigned int number_of_samples = ctx->number_of_samples;
@@ -1883,8 +1888,8 @@ static int apply_filter(MLPEncodeContext *ctx, unsigned int channel)
     int i;
 
     for (i = 0; i < 8; i++) {
-        filter_state_buffer[FIR][i] = *sample_buffer;
-        filter_state_buffer[IIR][i] = *sample_buffer;
+        filter_state_buffer[ctx->number_of_samples*FIR + i] = *sample_buffer;
+        filter_state_buffer[ctx->number_of_samples*IIR + i] = *sample_buffer;
 
         sample_buffer += ctx->num_channels;
     }
@@ -1897,7 +1902,7 @@ static int apply_filter(MLPEncodeContext *ctx, unsigned int channel)
 
         for (filter = 0; filter < NUM_FILTERS; filter++)
             for (order = 0; order < fp[filter]->order; order++)
-                accum += (int64_t)filter_state_buffer[filter][i - 1 - order] *
+                accum += (int64_t)filter_state_buffer[ctx->number_of_samples*filter + (i - 1 - order)] *
                          fp[filter]->coeff[order];
 
         accum  >>= filter_shift;
@@ -1906,23 +1911,25 @@ static int apply_filter(MLPEncodeContext *ctx, unsigned int channel)
         if (residual < INT24_MIN || residual > INT24_MAX)
             return -1;
 
-        filter_state_buffer[FIR][i] = sample;
-        filter_state_buffer[IIR][i] = residual;
+        filter_state_buffer[ctx->number_of_samples*FIR + i] = sample;
+        filter_state_buffer[ctx->number_of_samples*IIR + i] = residual;
 
         sample_buffer += ctx->num_channels;
     }
 
     sample_buffer = ctx->sample_buffer + channel;
     for (i = 0; i < number_of_samples; i++) {
-        *sample_buffer = filter_state_buffer[IIR][i];
+        *sample_buffer = filter_state_buffer[ctx->number_of_samples*IIR+i];
 
         sample_buffer += ctx->num_channels;
     }
 
+    av_free(filter_state_buffer);
+
     return 0;
 }
 
-static void apply_filters(MLPEncodeContext *ctx)
+static void apply_filters(AlacEncodeContext *ctx)
 {
     RestartHeader *rh = ctx->cur_restart_header;
     int channel;
@@ -1939,7 +1946,7 @@ static void apply_filters(MLPEncodeContext *ctx)
 }
 
 /** Generates two noise channels worth of data. */
-static void generate_2_noise_channels(MLPEncodeContext *ctx)
+static void generate_2_noise_channels(AlacEncodeContext *ctx)
 {
     int32_t *sample_buffer = ctx->sample_buffer + ctx->num_channels - 2;
     RestartHeader *rh = ctx->cur_restart_header;
@@ -1960,7 +1967,7 @@ static void generate_2_noise_channels(MLPEncodeContext *ctx)
 }
 
 /** Rematrixes all channels using chosen coefficients. */
-static void rematrix_channels(MLPEncodeContext *ctx)
+static void rematrix_channels(AlacEncodeContext *ctx)
 {
     DecodingParams *dp = ctx->cur_decoding_params;
     MatrixParams *mp = &dp->matrix_params;
@@ -2023,7 +2030,7 @@ static int compare_best_offset(BestOffset *prev, BestOffset *cur)
     return 0;
 }
 
-static int best_codebook_path_cost(MLPEncodeContext *ctx, unsigned int channel,
+static int best_codebook_path_cost(AlacEncodeContext *ctx, unsigned int channel,
                                    PathCounter *src, int cur_codebook)
 {
     BestOffset *cur_bo, *prev_bo = restart_best_offset;
@@ -2048,7 +2055,7 @@ static int best_codebook_path_cost(MLPEncodeContext *ctx, unsigned int channel,
     return bitcount;
 }
 
-static void set_best_codebook(MLPEncodeContext *ctx)
+static void set_best_codebook(AlacEncodeContext *ctx)
 {
 //    ChannelParams (*seq_cp)[ctx->avctx->channels] = (ChannelParams (*)[ctx->avctx->channels]) ctx->seq_channel_params;
     DecodingParams *dp = ctx->cur_decoding_params;
@@ -2132,7 +2139,7 @@ static void set_best_codebook(MLPEncodeContext *ctx)
  *  individual access unit.
  *  TODO This is just a stub!
  */
-static void set_major_params(MLPEncodeContext *ctx)
+static void set_major_params(AlacEncodeContext *ctx)
 {
     RestartHeader *rh = ctx->cur_restart_header;
 //    ChannelParams (*channel_params)[ctx->sequence_size][ctx->avctx->channels] =
@@ -2142,8 +2149,6 @@ static void set_major_params(MLPEncodeContext *ctx)
     ChannelParams **channel_params;
     DecodingParams **decoding_params;
     unsigned int index;
-//    DecodingParams (*decoding_params)[ctx->sequence_size][ctx->num_substreams] =
-//                  (DecodingParams (*)[ctx->sequence_size][ctx->num_substreams]) ctx->decoding_params;
     unsigned int substr;
     uint8_t max_huff_lsbs = 0;
     uint8_t max_output_bits = 0;
@@ -2162,6 +2167,7 @@ static void set_major_params(MLPEncodeContext *ctx)
                 max_huff_lsbs = channel_params[(ctx->restart_intervals-1) * ctx->sequence_size * ctx->avctx->channels					 + (ctx->seq_offset[ctx->restart_intervals -1]) * ctx->avctx->channels][ ctx->avctx->channels *index +channel].huff_lsbs;
 		}
                 memcpy(&ctx->major_channel_params[index][channel], &channel_params[(ctx->restart_intervals-1) * ctx->sequence_size * ctx->avctx->channels + (ctx->seq_offset[ctx->restart_intervals -1]) * ctx->avctx->channels][ ctx->avctx->channels *index +channel] , sizeof(ChannelParams));
+
             }
         }
     }
@@ -2196,7 +2202,7 @@ static void set_major_params(MLPEncodeContext *ctx)
     ctx->major_cur_subblock_index = 0;
 }
 
-static void analyze_sample_buffer(MLPEncodeContext *ctx)
+static void analyze_sample_buffer(AlacEncodeContext *ctx)
 {
 //    ChannelParams (*seq_cp)[ctx->avctx->channels] = (ChannelParams (*)[ctx->avctx->channels]) ctx->seq_channel_params;
 //    DecodingParams (*seq_dp)[ctx->num_substreams] = (DecodingParams (*)[ctx->num_substreams]) ctx->seq_decoding_params;
@@ -2244,7 +2250,7 @@ static void analyze_sample_buffer(MLPEncodeContext *ctx)
     }
 }
 
-static void process_major_frame(MLPEncodeContext *ctx)
+static void process_major_frame(AlacEncodeContext *ctx)
 {
     unsigned int substr;
 
@@ -2273,10 +2279,10 @@ static void process_major_frame(MLPEncodeContext *ctx)
 
 /****************************************************************************/
 
-static int mlp_encode_frame(AVCodecContext *avctx, uint8_t *buf, int buf_size,
+static int alac_encode_frame(AVCodecContext *avctx, uint8_t *buf, int buf_size,
                             void *data)
 {
-    MLPEncodeContext *ctx = avctx->priv_data;
+    AlacEncodeContext *ctx = avctx->priv_data;
     unsigned int bytes_written = 0;
     int restart_frame;
 
@@ -2359,7 +2365,7 @@ input_and_return:
          seq_index < ctx->restart_intervals && (seq_index * ctx->min_restart_interval) <= ctx->avctx->frame_number;
          seq_index++) {
 //        ChannelParams (*seq_cp)[ctx->avctx->channels] = &channel_params[(ctx->frame_index / ctx->min_restart_interval)][ctx->seq_offset[seq_index]];
-//       DecodingParams (*seq_dp)[ctx->num_substreams] = &decoding_params[(ctx->frame_index / ctx->min_restart_interval)][ctx->seq_offset[seq_index]];
+//        DecodingParams (*seq_dp)[ctx->num_substreams] = &decoding_params[(ctx->frame_index / ctx->min_restart_interval)][ctx->seq_offset[seq_index]];
         unsigned int number_of_samples = 0;
         unsigned int index;
 
@@ -2407,9 +2413,9 @@ no_data_left:
     return bytes_written;
 }
 
-static av_cold int mlp_encode_close(AVCodecContext *avctx)
+static av_cold int alac_encode_close(AVCodecContext *avctx)
 {
-    MLPEncodeContext *ctx = avctx->priv_data;
+    AlacEncodeContext *ctx = avctx->priv_data;
 
     av_freep(&ctx->lossless_check_data);
     av_freep(&ctx->major_scratch_buffer);
@@ -2426,12 +2432,12 @@ static av_cold int mlp_encode_close(AVCodecContext *avctx)
 
 AVCodec mlp_encoder = {
     "mlp",
-    CODEC_TYPE_AUDIO,
-    CODEC_ID_MLP,
-    sizeof(MLPEncodeContext),
-    mlp_encode_init,
-    mlp_encode_frame,
-    mlp_encode_close,
+    AVMEDIA_TYPE_AUDIO,
+    AV_CODEC_ID_ALAC,
+    sizeof(AlacEncodeContext),
+    alac_encode_init,
+    alac_encode_frame,
+    alac_encode_close,
     .capabilities = CODEC_CAP_SMALL_LAST_FRAME | CODEC_CAP_DELAY,
     .sample_fmts = (enum AVSampleFormat[]){AV_SAMPLE_FMT_S16,AV_SAMPLE_FMT_S32,AV_SAMPLE_FMT_NONE},
     .long_name = NULL_IF_CONFIG_SMALL("MLP (Meridian Lossless Packing)"),
