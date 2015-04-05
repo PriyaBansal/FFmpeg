@@ -1465,8 +1465,9 @@ static void set_filter_params(MLPEncodeContext *ctx,
 
         order = ff_lpc_calc_coefs(&ctx->lpc_ctx, ctx->lpc_sample_buffer, ctx->number_of_samples,
                                   MLP_MIN_LPC_ORDER, max_order, 11,
-                                  coefs, shift, 1,
-                                  ORDER_METHOD_EST, MLP_MIN_LPC_SHIFT, MLP_MAX_LPC_SHIFT, MLP_MIN_LPC_SHIFT);
+                                  coefs, shift, FF_LPC_TYPE_CHOLESKY,
+                                  MLP_MIN_LPC_SHIFT, ORDER_METHOD_EST, MLP_MAX_LPC_SHIFT, MLP_MIN_LPC_SHIFT);
+//                                  ORDER_METHOD_EST, MLP_MIN_LPC_SHIFT, MLP_MAX_LPC_SHIFT, MLP_MIN_LPC_SHIFT);
 
         fp->order = order;
         fp->shift = shift[order-1];
@@ -2146,8 +2147,6 @@ static void set_major_params(MLPEncodeContext *ctx)
 //                 (ChannelParams (*)[ctx->sequence_size][ctx->avctx->channels]) ctx->channel_params;
 //    DecodingParams (*decoding_params)[ctx->sequence_size][ctx->num_substreams] =
 //                  (DecodingParams (*)[ctx->sequence_size][ctx->num_substreams]) ctx->decoding_params;
-    ChannelParams **channel_params;
-    DecodingParams **decoding_params;
     unsigned int index;
     unsigned int substr;
     uint8_t max_huff_lsbs = 0;
@@ -2160,13 +2159,12 @@ static void set_major_params(MLPEncodeContext *ctx)
 //	             (ChannelParams (*)[ctx->avctx->channels]) &channel_params[ctx->restart_intervals - 1][ctx->seq_offset[ctx->restart_intervals - 1]];
         unsigned int channel;
         for (index = 0; index < ctx->seq_size[ctx->restart_intervals-1]; index++) {
-            memcpy(&ctx->major_decoding_params[index][substr], &decoding_params[(ctx->restart_intervals -1) * ctx->sequence_size                                 					 * ctx->num_substreams + (ctx->seq_offset[ctx->restart_intervals -1])									   * ctx->num_substreams][ctx->num_substreams*index + substr], 
-			    				       sizeof(DecodingParams));
+            memcpy(&ctx->major_decoding_params[index][substr], (&(ctx->decoding_params[(ctx->restart_intervals - 1)*(ctx->sequence_size)*(ctx->num_substreams) + ctx->seq_offset[ctx->restart_intervals - 1] + ctx->num_substreams * index + substr])) , 			    				       sizeof(DecodingParams));
             for (channel = 0; channel < ctx->avctx->channels; channel++) {
-                if (max_huff_lsbs < channel_params[(ctx->restart_intervals-1) * ctx->sequence_size * ctx->avctx->channels 				+ (ctx->seq_offset[ctx->restart_intervals -1]) * ctx->avctx->channels][ ctx->avctx->channels *index +channel].huff_lsbs){
-                max_huff_lsbs = channel_params[(ctx->restart_intervals-1) * ctx->sequence_size * ctx->avctx->channels					 + (ctx->seq_offset[ctx->restart_intervals -1]) * ctx->avctx->channels][ ctx->avctx->channels *index +channel].huff_lsbs;
+                if (max_huff_lsbs < (ctx->channel_params[(ctx->restart_intervals - 1)*(ctx->sequence_size)*(ctx->avctx->channels) + ctx->seq_offset[ctx->restart_intervals - 1] + ctx->avctx->channels * index + channel].huff_lsbs)){
+                max_huff_lsbs = (ctx->channel_params[(ctx->restart_intervals - 1)*(ctx->sequence_size)*(ctx->avctx->channels) + ctx->seq_offset[ctx->restart_intervals - 1] + ctx->avctx->channels * index + channel].huff_lsbs);
 		}
-                memcpy(&ctx->major_channel_params[index][channel], &channel_params[(ctx->restart_intervals-1) * ctx->sequence_size * ctx->avctx->channels + (ctx->seq_offset[ctx->restart_intervals -1]) * ctx->avctx->channels][ ctx->avctx->channels *index +channel] , sizeof(ChannelParams));
+                memcpy(&ctx->major_channel_params[index][channel], (&(ctx->channel_params[(ctx->restart_intervals - 1)*(ctx->sequence_size)*(ctx->avctx->channels) + ctx->seq_offset[ctx->restart_intervals - 1] + ctx->avctx->channels * index + channel])), sizeof(ChannelParams));
 
             }
         }
@@ -2357,8 +2355,6 @@ input_and_return:
 //                 (ChannelParams (*)[ctx->sequence_size][ctx->avctx->channels]) ctx->channel_params;
 //    DecodingParams (*decoding_params)[ctx->sequence_size][ctx->num_substreams] =
 //                  (DecodingParams (*)[ctx->sequence_size][ctx->num_substreams]) ctx->decoding_params;
-	ChannelParams **channel_params;
-	DecodingParams **decoding_params;
     int seq_index;
 
     for (seq_index = 0;
@@ -2378,18 +2374,18 @@ input_and_return:
         ctx->number_of_frames = ctx->next_major_number_of_frames;
         ctx->number_of_subblocks = ctx->next_major_number_of_frames + 1;
 
-        ctx->seq_channel_params = (ChannelParams *) &channel_params[(ctx->frame_index / ctx->min_restart_interval)*ctx->sequence_size *                                      ctx->avctx->channels + (ctx->seq_offset[seq_index])*ctx->avctx->channels];
+        ctx->seq_channel_params = (ChannelParams *)(&ctx->channel_params[(ctx->frame_index / ctx->min_restart_interval)*(ctx->sequence_size)*(ctx->avctx->channels) + (ctx->seq_offset[seq_index])]);
 
-        ctx->seq_decoding_params = (DecodingParams *) &decoding_params[(ctx->frame_index / ctx->min_restart_interval)* ctx->sequence_size                                     * ctx->num_substreams + (ctx->seq_offset[seq_index]) *ctx->num_substreams];
-
+        ctx->seq_decoding_params = (DecodingParams *) (&ctx->decoding_params[(ctx->frame_index / ctx->min_restart_interval)*(ctx->sequence_size)*(ctx->num_substreams) + (ctx->seq_offset[seq_index])]);
+	
         for (index = 0; index < ctx->number_of_frames; index++) {
             number_of_samples += ctx->frame_size[(ctx->starting_frame_index + index) % ctx->max_restart_interval];
         }
         ctx->number_of_samples = number_of_samples;
 
         for (index = 0; index < ctx->seq_size[seq_index]; index++) {
-            clear_channel_params(ctx, &channel_params[(ctx->frame_index /ctx->min_restart_interval)*ctx->sequence_size *ctx->avctx->channels + (ctx->seq_offset[seq_index])*ctx->avctx->channels][ctx->avctx->channels*index]);
-            default_decoding_params(ctx, &decoding_params[(ctx->frame_index / ctx->min_restart_interval)* ctx->sequence_size * ctx->num_substreams + ctx->seq_offset[seq_index] *ctx->num_substreams][ctx->num_substreams*index]);
+            clear_channel_params(ctx, &ctx->channel_params[(ctx->frame_index / ctx->min_restart_interval)*(ctx->sequence_size)*(ctx->avctx->channels) + (ctx->seq_offset[seq_index]) +(ctx->avctx->channels) * index]);
+            default_decoding_params(ctx, &ctx->decoding_params[(ctx->frame_index / ctx->min_restart_interval)*(ctx->sequence_size)*(ctx->num_substreams) + (ctx->seq_offset[seq_index]) + (ctx->num_substreams) * index]);
         }
 
         input_to_sample_buffer(ctx);
